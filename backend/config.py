@@ -1,5 +1,9 @@
 import os
 from datetime import timedelta
+from dotenv import load_dotenv  # <-- ADD THIS LINE
+
+# Load environment variables from .env file
+load_dotenv()  # <-- AND ADD THIS LINE
 
 class Config:
     """Base configuration class with common settings"""
