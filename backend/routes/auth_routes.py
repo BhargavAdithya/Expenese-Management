@@ -1,10 +1,11 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
-from app import db
+from database import db  # <-- CHANGE THIS LINE
 from models import User, Company
 from datetime import datetime
 import requests
 
+# ... (the rest of the file is unchanged)
 auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.route('/signup', methods=['POST'])
@@ -26,25 +27,22 @@ def signup():
             return jsonify({'error': 'Email already registered'}), 400
         
         # Get currency for the country
+        currency = 'USD' # Default
         try:
-            response = requests.get('https://restcountries.com/v3.1/all?fields=name,currencies')
+            response = requests.get('https://restcountries.com/v3.1/all?fields=name,currencies', timeout=5)
+            response.raise_for_status()
             countries = response.json()
             
-            currency = None
             for country in countries:
-                if country['name']['common'].lower() == data['country'].lower():
-                    # Get first currency code
+                if country.get('name', {}).get('common', '').lower() == data['country'].lower():
                     currencies = country.get('currencies', {})
                     if currencies:
                         currency = list(currencies.keys())[0]
-                    break
-            
-            if not currency:
-                currency = 'USD'  # Default fallback
-        except:
-            currency = 'USD'  # Fallback if API fails
+                        break
+        except requests.exceptions.RequestException as e:
+            print(f"Could not fetch currency, defaulting to USD. Error: {e}")
         
-        # Create company (auto-created on first signup)
+        # Create company
         company_name = data.get('company_name', f"{data['full_name']}'s Company")
         company = Company(
             name=company_name,
@@ -52,13 +50,13 @@ def signup():
             currency=currency
         )
         db.session.add(company)
-        db.session.flush()  # Get company ID
+        db.session.flush()
         
         # Create admin user
         user = User(
             email=data['email'],
             full_name=data['full_name'],
-            role='admin',  # First user is admin
+            role='admin',
             company_id=company.id
         )
         user.set_password(data['password'])
@@ -80,7 +78,9 @@ def signup():
         
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        # It's good practice to log the actual error for debugging
+        print(f"Error during signup: {e}")
+        return jsonify({'error': 'An internal server error occurred'}), 500
 
 
 @auth_bp.route('/login', methods=['POST'])

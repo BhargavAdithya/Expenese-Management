@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import API from "../api/axios";
+import React from "react";
 
 export default function Approvals() {
   const [approvals, setApprovals] = useState([]);
